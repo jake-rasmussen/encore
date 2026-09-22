@@ -478,6 +478,8 @@ export function LiveStudio() {
             notice={result?.notice}
             confirmed={confirmed}
             generating={generating}
+            imageSrc={demoMode ? demoFrame : frames.at(-1) ?? null}
+            videoSrc={demoMode ? '/demo/stream.mp4' : null}
             onChange={setDraft}
             onConfirm={confirmListing}
             onRegenerate={generate}

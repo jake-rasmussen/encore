@@ -42,6 +42,8 @@ export function ListingDraftPanel({
   notice,
   confirmed,
   generating,
+  imageSrc,
+  videoSrc,
   onChange,
   onConfirm,
   onRegenerate,
@@ -52,6 +54,8 @@ export function ListingDraftPanel({
   notice?: string
   confirmed: boolean
   generating: boolean
+  imageSrc?: string | null
+  videoSrc?: string | null
   onChange: (next: ListingDraft) => void
   onConfirm: () => void
   onRegenerate: () => void
@@ -136,6 +140,31 @@ export function ListingDraftPanel({
       ) : null}
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {imageSrc || videoSrc ? (
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Captured from stream</span>
+            <div className="grid grid-cols-2 gap-2">
+              {imageSrc ? (
+                <img
+                  src={imageSrc || '/placeholder.svg'}
+                  alt="Product frame captured from the live stream"
+                  className="aspect-square w-full rounded-lg border border-border object-cover"
+                />
+              ) : null}
+              {videoSrc ? (
+                <video
+                  src={videoSrc}
+                  className="aspect-square w-full rounded-lg border border-border object-cover"
+                  controls
+                  playsInline
+                  muted
+                  loop
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <Field label={`Title (${draft.title.length}/80)`}>
           <textarea
             value={draft.title}
