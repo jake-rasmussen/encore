@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const response: GenerateListingResponse = {
       source: 'sample',
       notice:
-        'Showing a sample listing — the AI model was not reachable in this environment. Deploy on Vercel for live AI generation.',
+        'The AI model is not reachable in this environment, so this is a fixed sample listing — it does NOT reflect your audio or frames. Deploy on Vercel (or set an AI Gateway key) to generate a real listing from what you actually show and say.',
       draft: sampleDraft(transcript),
     }
     return NextResponse.json(response)

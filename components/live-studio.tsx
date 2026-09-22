@@ -2,6 +2,8 @@
 
 import {
   Camera,
+  Folder,
+  HardDrive,
   Loader2,
   Mic,
   MicOff,
@@ -22,6 +24,15 @@ import {
   type ListingDraft,
   sampleDraft,
 } from '@/lib/listing'
+import {
+  downloadSessionFiles,
+  fsAccessSupported,
+  loadRememberedDirectory,
+  pickBaseDirectory,
+  rememberBaseDirectory,
+  saveSessionToDirectory,
+  type SessionSave,
+} from '@/lib/magical-inventory'
 
 type Phase = 'idle' | 'live'
 
@@ -47,6 +58,17 @@ export function LiveStudio() {
   const [result, setResult] = useState<GenerateListingResponse | null>(null)
   const [draft, setDraft] = useState<ListingDraft | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+
+  // Local "Magical Inventory" storage.
+  const baseDirRef = useRef<Awaited<ReturnType<typeof pickBaseDirectory>>>(null)
+  const sessionStartRef = useRef<Date | null>(null)
+  const [baseDirName, setBaseDirName] = useState<string | null>(null)
+  const [fsSupported, setFsSupported] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<{
+    kind: 'idle' | 'saving' | 'saved' | 'downloaded' | 'error'
+    msg?: string
+  }>({ kind: 'idle' })
 
   const transcript = [speech.finalText, speech.interimText].filter(Boolean).join(' ').trim()
 
@@ -78,6 +100,17 @@ export function LiveStudio() {
     if (demoMode && demoFrame && frames.length === 0) setFrames([demoFrame])
   }, [demoMode, demoFrame, frames.length])
 
+  // Detect File System Access support and restore any previously chosen folder.
+  useEffect(() => {
+    setFsSupported(fsAccessSupported())
+    loadRememberedDirectory().then((handle) => {
+      if (handle) {
+        baseDirRef.current = handle
+        setBaseDirName(handle.name)
+      }
+    })
+  }, [])
+
   // Timer + auto frame capture while live.
   useEffect(() => {
     if (phase !== 'live') return
@@ -103,33 +136,86 @@ export function LiveStudio() {
     setElapsed(0)
   }, [])
 
+  // Write the current session into Magical Inventory/<stream start>/ (or fall
+  // back to downloading the files when folder access isn't available).
+  const persistSession = useCallback(
+    async (recordingBlob: Blob | null, listing: ListingDraft | null) => {
+      const start = sessionStartRef.current
+      if (!start) return
+      const payload: SessionSave = {
+        start,
+        durationSec: elapsed,
+        transcript,
+        demo: demoMode,
+        listing: listing ?? undefined,
+        recording: recordingBlob,
+        frames: demoMode ? [] : frames,
+      }
+      const base = baseDirRef.current
+      if (base) {
+        try {
+          setSaveStatus({ kind: 'saving' })
+          const res = await saveSessionToDirectory(base, payload)
+          setSaveStatus({ kind: 'saved', msg: res.path })
+        } catch (e) {
+          console.log('[v0] folder save failed, downloading instead:', (e as Error)?.message)
+          downloadSessionFiles(payload)
+          setSaveStatus({ kind: 'downloaded', msg: 'folder write failed — downloaded instead' })
+        }
+      } else if (!fsSupported) {
+        downloadSessionFiles(payload)
+        setSaveStatus({ kind: 'downloaded' })
+      } else {
+        setSaveStatus({ kind: 'error', msg: 'Choose a save folder to store this session.' })
+      }
+    },
+    [elapsed, transcript, demoMode, frames, fsSupported],
+  )
+
+  const chooseFolder = useCallback(async () => {
+    const handle = await pickBaseDirectory()
+    if (!handle) return
+    baseDirRef.current = handle
+    setBaseDirName(handle.name)
+    rememberBaseDirectory(handle)
+  }, [])
+
   const goLive = useCallback(async () => {
     resetSession()
+    setSaveStatus({ kind: 'idle' })
     setDemoMode(false)
     const ok = await camera.start()
     if (ok) {
+      sessionStartRef.current = new Date()
       speech.reset()
       speech.start()
+      if (camera.startRecording()) setRecording(true)
       setPhase('live')
     }
   }, [camera, speech, resetSession])
 
   const startDemo = useCallback(() => {
     resetSession()
+    setSaveStatus({ kind: 'idle' })
     setDemoMode(true)
+    sessionStartRef.current = new Date()
     speech.setManualText(DEMO_TRANSCRIPT)
     if (demoFrame) setFrames([demoFrame])
     setPhase('live')
   }, [speech, demoFrame, resetSession])
 
-  const endStream = useCallback(() => {
+  const endStream = useCallback(async () => {
+    // Capture the recording before we stop the camera tracks.
+    const blob = demoMode ? null : await camera.stopRecording()
+    setRecording(false)
+    await persistSession(blob, draft)
     camera.stop()
     speech.stop()
     speech.reset()
     setDemoMode(false)
     setPhase('idle')
     resetSession()
-  }, [camera, speech, resetSession])
+  }, [camera, speech, resetSession, demoMode, persistSession, draft])
 
   const captureNow = useCallback(() => {
     if (demoMode) {
@@ -166,7 +252,8 @@ export function LiveStudio() {
       console.log('[v0] generate failed client-side, using sample:', (e as Error).message)
       const fallback: GenerateListingResponse = {
         source: 'sample',
-        notice: 'Could not reach the generator; showing a sample draft.',
+        notice:
+          'The AI model could not be reached, so this is a fixed sample — it does not reflect what you said or showed.',
         draft: sampleDraft(t),
       }
       setResult(fallback)
@@ -175,6 +262,12 @@ export function LiveStudio() {
       setGenerating(false)
     }
   }, [demoMode, demoFrame, frames, transcript, camera])
+
+  const confirmListing = useCallback(async () => {
+    setConfirmed(true)
+    // Persist the confirmed listing into the same session folder.
+    await persistSession(null, draft)
+  }, [persistSession, draft])
 
   const canGenerate = phase === 'live' && (demoMode || frames.length > 0 || transcript.length > 0)
   const isLive = phase === 'live'
@@ -214,6 +307,11 @@ export function LiveStudio() {
                 <span className="rounded-full bg-black/50 px-2.5 py-1 font-mono text-xs text-white backdrop-blur-sm">
                   {formatTime(elapsed)}
                 </span>
+                {recording ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-xs text-white backdrop-blur-sm">
+                    <span className="live-dot size-1.5 rounded-full bg-live" /> REC
+                  </span>
+                ) : null}
               </div>
             ) : (
               <span />
@@ -309,6 +407,40 @@ export function LiveStudio() {
             )}
           </div>
         </div>
+
+        {/* Local "Magical Inventory" storage */}
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-xs">
+          <HardDrive className="size-4 shrink-0 text-primary" />
+          {baseDirName ? (
+            <span className="text-foreground">
+              Saving to <span className="font-medium">{baseDirName}</span>
+              <span className="text-muted-foreground"> / Magical Inventory / &lt;stream start&gt;</span>
+            </span>
+          ) : fsSupported ? (
+            <span className="text-muted-foreground">
+              Choose a folder (e.g. your Desktop) to save each stream&apos;s video recording + transcript.
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              This browser can&apos;t write to folders, so sessions will download as files instead.
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {saveStatus.kind === 'saving' ? <span className="text-muted-foreground">Saving…</span> : null}
+            {saveStatus.kind === 'saved' ? (
+              <span className="text-primary">Saved to {saveStatus.msg}</span>
+            ) : null}
+            {saveStatus.kind === 'downloaded' ? (
+              <span className="text-primary">Session downloaded{saveStatus.msg ? ` (${saveStatus.msg})` : ''}</span>
+            ) : null}
+            {saveStatus.kind === 'error' ? <span className="text-live">{saveStatus.msg}</span> : null}
+            {fsSupported ? (
+              <Button size="sm" variant={baseDirName ? 'ghost' : 'secondary'} onClick={chooseFolder}>
+                <Folder className="size-4" /> {baseDirName ? 'Change' : 'Choose folder'}
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {/* Right column */}
@@ -321,7 +453,7 @@ export function LiveStudio() {
             confirmed={confirmed}
             generating={generating}
             onChange={setDraft}
-            onConfirm={() => setConfirmed(true)}
+            onConfirm={confirmListing}
             onRegenerate={generate}
             onDiscard={() => {
               setDraft(null)
