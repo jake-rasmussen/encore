@@ -71,35 +71,37 @@ export function sampleDraft(transcript?: string): ListingDraft {
   return {
     isSellableProduct: true,
     rejectionReason: null,
-    title: 'Vintage Polaroid SX-70 Land Camera Folding Instant Film — Tested & Working',
-    category: 'Cameras & Photo > Vintage Movie & Photography > Vintage Cameras',
+    title: "Guess Women's Black Cotton Jacket Sherpa-Lined Full-Zip Medium — Pre-Owned",
+    category: "Clothing, Shoes & Accessories > Women > Women's Clothing > Coats, Jackets & Vests",
     condition: 'Used - Good',
-    brand: 'Polaroid',
-    model: 'SX-70',
+    brand: 'Guess',
+    model: null,
     keyFeatures: [
-      'Iconic folding SLR body in brown leather & brushed chrome',
-      'Uses SX-70 / 600-type instant film',
-      'Fully manual focus with classic optical viewfinder',
-      'Tested and confirmed working on stream',
+      'Sherpa fleece-lined collar for warmth',
+      'Full-zip front with snap-button placket',
+      'Snap chest pocket plus front hand pockets',
+      '100% cotton, size Medium',
     ],
     description:
-      'Classic Polaroid SX-70 folding instant camera in good vintage condition with light cosmetic wear consistent with age.' +
-      ' A collector favorite that still produces charming instant prints.' +
+      'Pre-owned Guess black jacket in 100% cotton, size Medium.' +
+      ' Full-zip front with a snap placket, a snap chest pocket, and a cozy sherpa fleece-lined collar.' +
+      ' In good used condition with only light wear consistent with normal use.' +
       spokenNote,
     itemSpecifics: [
-      { name: 'Type', value: 'Instant Film Camera' },
-      { name: 'Brand', value: 'Polaroid' },
-      { name: 'Model', value: 'SX-70' },
-      { name: 'Color', value: 'Brown / Chrome' },
-      { name: 'Film Format', value: 'SX-70 Instant' },
+      { name: 'Type', value: 'Jacket' },
+      { name: 'Brand', value: 'Guess' },
+      { name: 'Department', value: 'Women' },
+      { name: 'Size', value: 'M (Medium)' },
+      { name: 'Material', value: '100% Cotton' },
+      { name: 'Color', value: 'Black' },
     ],
-    suggestedPrice: { low: 120, high: 185, currency: 'USD' },
+    suggestedPrice: { low: 20, high: 20, currency: 'USD' },
     confidence: 'medium',
   }
 }
 
 export const DEMO_TRANSCRIPT =
-  "Alright everyone, check this out — this is a vintage Polaroid SX-70 Land Camera. " +
-  "It's the original folding model with the real leather and chrome finish. I just tested it and it fires perfectly, " +
-  "the bellows are light-tight, no cracks. Takes SX-70 film. There's a little wear on the corners but honestly it " +
-  "looks amazing for its age. This is a collector's piece, who wants it?"
+  "Okay next up I've got this Guess black jacket, this one is a really nice piece. " +
+  "It's a women's medium, one hundred percent cotton, and it's got that soft sherpa fleece lining right along the collar. " +
+  'Full zip up the front with the snap buttons over it, a little snap pocket on the chest and pockets on the sides. ' +
+  "It's pre-owned but honestly in great shape, just a little bit of wear. I'm letting this one go for twenty dollars, who wants it?"

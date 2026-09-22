@@ -53,6 +53,7 @@ export function LiveStudio() {
   const [elapsed, setElapsed] = useState(0)
   const [frames, setFrames] = useState<string[]>([])
   const [demoFrame, setDemoFrame] = useState<string | null>(null)
+  const demoVideoRef = useRef<HTMLVideoElement>(null)
 
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GenerateListingResponse | null>(null)
@@ -75,7 +76,7 @@ export function LiveStudio() {
   // Preload the demo product frame as a data URL so demo mode works offline.
   useEffect(() => {
     let cancelled = false
-    fetch('/demo/product-frame.png')
+    fetch('/demo/jacket.png')
       .then((r) => r.blob())
       .then(
         (b) =>
@@ -202,11 +203,27 @@ export function LiveStudio() {
     speech.setManualText(DEMO_TRANSCRIPT)
     if (demoFrame) setFrames([demoFrame])
     setPhase('live')
+    // Restart the hard-coded demo stream video from the top.
+    requestAnimationFrame(() => {
+      const v = demoVideoRef.current
+      if (v) {
+        v.currentTime = 0
+        v.play().catch(() => {})
+      }
+    })
   }, [speech, demoFrame, resetSession])
 
   const endStream = useCallback(async () => {
-    // Capture the recording before we stop the camera tracks.
-    const blob = demoMode ? null : await camera.stopRecording()
+    // Capture the recording before we stop the camera tracks. In demo mode we
+    // persist the hard-coded demo stream video as the session recording.
+    let blob: Blob | null
+    if (demoMode) {
+      blob = await fetch('/demo/stream.mp4')
+        .then((r) => r.blob())
+        .catch(() => null)
+    } else {
+      blob = await camera.stopRecording()
+    }
     setRecording(false)
     await persistSession(blob, draft)
     camera.stop()
@@ -277,13 +294,22 @@ export function LiveStudio() {
       {/* Stage + capture controls */}
       <div className="flex flex-col gap-3">
         <div className="relative aspect-video overflow-hidden rounded-2xl border border-border bg-black">
-          {/* Dim poster behind everything */}
+          {/* Dim poster behind everything (idle only) */}
           <img
-            src="/demo/product-frame.png"
+            src="/demo/jacket.png"
             alt=""
             aria-hidden
+            className={`absolute inset-0 size-full object-cover ${!isLive ? 'opacity-20' : 'opacity-0'}`}
+          />
+          {/* Hard-coded demo stream video (plays during Run demo) */}
+          <video
+            ref={demoVideoRef}
+            src="/demo/stream.mp4"
+            loop
+            muted
+            playsInline
             className={`absolute inset-0 size-full object-cover ${
-              isLive && !demoMode ? 'opacity-0' : demoMode ? 'opacity-100' : 'opacity-20'
+              isLive && demoMode ? 'opacity-100' : 'opacity-0'
             }`}
           />
           {/* Live camera video */}
