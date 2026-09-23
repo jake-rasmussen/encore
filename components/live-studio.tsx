@@ -507,11 +507,18 @@ export function LiveStudio() {
                   <span className="text-muted-foreground italic">{speech.interimText}</span>
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  {speech.supported
-                    ? 'Start describing your item out loud — your words will appear here and feed the listing.'
-                    : 'Speech-to-text is not available in this browser. You can still generate from the captured frames.'}
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {speech.supported
+                      ? 'Start describing your item out loud — your words will appear here and feed the listing.'
+                      : 'Speech-to-text is not available in this browser. You can still generate from the captured frames.'}
+                  </p>
+                  {speech.error ? (
+                    <p className="rounded-md border border-live/40 bg-live/10 px-3 py-2 text-xs leading-relaxed text-live-foreground/90">
+                      {speech.error}
+                    </p>
+                  ) : null}
+                </div>
               )}
             </div>
             <div className="border-t border-border p-3">

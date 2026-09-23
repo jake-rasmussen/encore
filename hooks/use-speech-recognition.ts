@@ -35,6 +35,7 @@ export function useSpeechRecognition() {
   const [listening, setListening] = useState(false)
   const [finalText, setFinalText] = useState('')
   const [interimText, setInterimText] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setSupported(getRecognitionCtor() !== null)
@@ -42,7 +43,11 @@ export function useSpeechRecognition() {
 
   const start = useCallback(() => {
     const Ctor = getRecognitionCtor()
-    if (!Ctor) return false
+    if (!Ctor) {
+      setError('Speech-to-text is not supported in this browser. Try Chrome or Edge.')
+      return false
+    }
+    setError(null)
     const recognition = new Ctor()
     recognition.continuous = true
     recognition.interimResults = true
@@ -61,6 +66,17 @@ export function useSpeechRecognition() {
     }
     recognition.onerror = (e) => {
       console.log('[v0] Speech recognition error:', e.error)
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        setError(
+          'Microphone/speech access was blocked. Open the app in its own tab (not embedded) in Chrome or Edge and allow the mic.',
+        )
+        listeningRef.current = false
+        setListening(false)
+      } else if (e.error === 'no-speech') {
+        // transient — ignore, onend will restart
+      } else {
+        setError(`Speech recognition error: ${e.error}`)
+      }
     }
     recognition.onend = () => {
       // Auto-restart while the user intends to keep listening (recognition
@@ -98,6 +114,7 @@ export function useSpeechRecognition() {
   const reset = useCallback(() => {
     setFinalText('')
     setInterimText('')
+    setError(null)
   }, [])
 
   const setManualText = useCallback((text: string) => {
@@ -112,5 +129,5 @@ export function useSpeechRecognition() {
     }
   }, [])
 
-  return { supported, listening, finalText, interimText, start, stop, reset, setManualText }
+  return { supported, listening, finalText, interimText, error, start, stop, reset, setManualText }
 }
