@@ -181,20 +181,6 @@ export function LiveStudio() {
     rememberBaseDirectory(handle)
   }, [])
 
-  const goLive = useCallback(async () => {
-    resetSession()
-    setSaveStatus({ kind: 'idle' })
-    setDemoMode(false)
-    const ok = await camera.start()
-    if (ok) {
-      sessionStartRef.current = new Date()
-      speech.reset()
-      speech.start()
-      if (camera.startRecording()) setRecording(true)
-      setPhase('live')
-    }
-  }, [camera, speech, resetSession])
-
   const startDemo = useCallback(() => {
     resetSession()
     setSaveStatus({ kind: 'idle' })
@@ -212,6 +198,25 @@ export function LiveStudio() {
       }
     })
   }, [speech, demoFrame, resetSession])
+
+  const goLive = useCallback(async () => {
+    resetSession()
+    setSaveStatus({ kind: 'idle' })
+    setDemoMode(false)
+    const ok = await camera.start()
+    if (ok) {
+      sessionStartRef.current = new Date()
+      speech.reset()
+      speech.start()
+      if (camera.startRecording()) setRecording(true)
+      setPhase('live')
+      return
+    }
+    // No camera available (e.g. this preview sandbox or an embedded iframe
+    // without camera permission). Fall back to the demo stream so the POC
+    // flow still works end to end instead of dead-ending on an error.
+    startDemo()
+  }, [camera, speech, resetSession, startDemo])
 
   const endStream = useCallback(async () => {
     // Capture the recording before we stop the camera tracks. In demo mode we
